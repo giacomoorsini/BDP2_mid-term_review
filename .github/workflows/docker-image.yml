@@ -15,6 +15,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build the Docker image
-      run: docker build . --file docker/Dockerfile --tag gorsini/BDP2_mid-term_review
+      run: docker build . --file docker/Dockerfile --tag gorsini/BDP2_mid_term_review
     - name: Push the image to Dockerhub
-      run: docker login -u gorsini -p ${{ secrets.DOCKER_TOKEN }} && docker push gorsini/BDP2_mid-term_review
+      run: docker login -u gorsini -p${{ secrets.DOCKER_TOKEN }} && docker push gorsini/BDP2_mid_term_review
