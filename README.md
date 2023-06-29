@@ -41,10 +41,16 @@ docker run -d --rm --name my_redis -v ~/review:/data --network bdp2-net --user 1
 ```
 docker run -d --rm --name my_jupyter -v ~/review:/home/jovyan -p 80:8888 --network bdp2-net -e JUPYTER_ENABLE_LAB=yes -e JUPYTER_TOKEN="password" --user root -e CHOWN_HOME=yes -e CHOWN_HOME_OPTS="-R" jupyter/minimal-notebook
 ```
+- the `-d` is the option to run container in background and print container ID
+- the `-p` indicates the ports from which the container is accessible form the host
+- the `-v` is to bind mount the indicated volume
+- the `-e` option introduces environmental variables
+- the `--rm` option tells to automatically remove the container when we exit it
+  
 You should change the JUPYTER_TOKEN with a password of your choice.
 As you can see, the image we are using is called `jupyter/minimal-notebook`
 
-<u>Note that are mapping the port `8888` to port `80` in the docker host, hence remember to open the security group of the virtual machine for port 80 and your IP adress.</u>
+<u> Note that are mapping the port `8888` to port `80` in the docker host, hence remember to open the security group of the virtual machine for port 80 and your IP adress.</u>
 
 
 ### 1.1 Access Jupyter and create a Redis database.
