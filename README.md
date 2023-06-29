@@ -22,6 +22,9 @@ For this exercise, a virtual machine built with **Amazon Web Service (AWS)** was
     - [3.4 Run the new image](#34-run-the-new-image)
 - [4. Create an application stack](#4-create-an-application-stack)
 - [5. Conclusion](#5-conclusion)
+- [6. Extra](#6-extra)
+    - [6.1 Try to implement https to jupyter](#61-try-to-implement-https-to-jupyter)
+    - [6.2  Show if and how it works on your laptop in the same way it works on VM1](#62-show-if-and-how-it-works-on-your-laptop-in-the-same-way-it-works-on-vm1)
   
 ## 1. Starting the Jupyter and Redis containers
 We want to run an existing Jupyter Notebook and Redis image. The aim is to access Jupyter Notebook from the web and create a simple Redis database. 
@@ -193,3 +196,23 @@ If you have done things correctly, you now have a single docker-compose command 
 Moreover, all is stored in a GitHub repository, which comprises a GitHub action that automatically builds and store a costume image on DockerHub.
 
 All the files generated for my mid term review are stored in the present directory.
+
+## 6. Extra
+### 6.1 Try to implement https to jupyter
+Jupyter Notebook can be accessed also with https. To do that, we need to add the port `433:8888` to our Jupyter container, in the `docker-compose` file.
+This, however will issue an error as port 443 is already occupied by Portainer. 
+
+To solve the error, I tried to issue the `docker run` command for the Jupyter image but changing the ports in the -p flag:
+```
+docker run -d --rm --name my_redis_jupyter -v ~/review/bdp2-review/work:/home/jovyan -p 80:8888 -p 443:8888 --network bdp2-net -e JUPYTER_ENABLE_LAB=yes -e JUPYTER_TOKEN="bdp2_ltm" --user root -e CHOWN_HOME=yes -e CHOWN_HOME_OPTS="-R" torresmasdeu/ltm_jupyter
+```
+The container is created with no issues, but still Jupyter is not accessible trough the https. Searching online, the solution seems to be that Jupyter can be accessible from https just with an `SSL certificate`, that enables the access.
+
+### 6.2  Show if and how it works on your laptop in the same way it works on VM1
+It is possible to execute the docker-compose from your own laptop. To do so, you have to have installe the `Docker Desktop app`.
+
+For semplicity, we may recreate the directory `review` as we did on VM1, so that we may use the same `docker-compose.yml`. We also should clone the GitHub repo in our new review directory.
+
+Then, by running the docker-compose like before, we should activate the three containers. We can check that with `docker ps`.
+
+To check if Jupyter and Portainer are working, you should try to connect by browsing `http://0.0.0.0:80` and `http://0.0.0.0:443`.
