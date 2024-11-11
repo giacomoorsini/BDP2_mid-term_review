@@ -18,11 +18,15 @@ Written by Giacomo Orsini
     - [1.1 Access Jupyter and create a Redis database.](#11-access-jupyter-and-create-a-redis-database)
 - [2. Clone a git repository in the VM](#2-clone-a-git-repository-in-the-vm)
 - [3. Extend the image](#3-extend-the-image)
-    - [3.1 Create a github action](#31-create-a-github-action)
+    - [3.1 Create a GitHub action](#31-create-a-github-action)
+        - [3.1.1 On GitHub](#311-on-github)
+        - [3.1.2 On DockerHub](#312-on-dockerhub)
+        - [3.1.3 Create the action](#313-create-the-action)
     - [3.2 Create the Dockerfile](#32-create-the-dockerfile)
     - [3.3 Trigger the action](#33-trigger-the-action)
     - [3.4 Run the new image](#34-run-the-new-image)
 - [4. Create an application stack](#4-create-an-application-stack)
+    -[4.1 Docker compose](#41-docker-compose)
 - [5. Conclusion](#5-conclusion)
 - [6. Extra](#6-extra)
     - [6.1 Try to implement https to jupyter](#61-try-to-implement-https-to-jupyter)
@@ -214,8 +218,7 @@ On the VM, now run the new image you created using the `docker run` command we u
 ```
 docker run -d --rm --name bdp2_mid_term_review -v ~/review/BDP2_mid-term_review/work:/home/jovyan -p 80:8888 --network bdp2-net -e JUPYTER_ENABLE_LAB=yes -e JUPYTER_TOKEN="bdp2_password" --user root -e CHOWN_HOME=yes -e CHOWN_HOME_OPTS="-R" gorsini/bdp2_mid_term_review
 ```
-
-Now, try again to build a small database as we did in step 1:
+Once it is running, open Jupyter Notebooks in your browser, http://<VM1_public_IP>:80, and create a new notebook (i.e. `dir_test.ipynb`). Now, try again to build a small database as we did in step 1:
 ```
 import redis
 r = redis.Redis(host='my_redis')
@@ -224,31 +227,107 @@ print(r.get('temperature'))
 ```
 The Redis module should be already available in the container, so you shouldn't receive any error messages. Check that the new Jupyter file is saved in the `work` directory (in my case, the saved file was `test1.ipynb`)
 
-Create the file `.gitignore` in the main directory of your local repo (use e.g vi) and write the following line into it to avoid git complaining about “*Notebook Checkpoints*” not being tracked:
+Before committing all, create the file `.gitignore` in the main directory of your local repo (use e.g vi) and write the following line into it to avoid git complaining about “*Notebook Checkpoints*” not being tracked:
 ```
 .ipynb_checkpoints
 ```
+This file includes the names of any files on the local repo that we do not want to commit to git. 
+
+Now:
+```
+git add * 
+git commit -a -m "Commit after docker run successful command"
+git push
+docker ps
+```
 
 ## 4. Create an application stack
-We now want to create an **application stack**, multiple containers linked together to provide a multi-container service, via **docker compose**. `Docker-compose` works by parsing a proper text file, written in the YAML language. Our file should have three services, building the Jupyter custom image we just created, the Redis image and a **Portainer** image. 
+We now want to create an **application stack**, multiple containers linked together to provide a multi-container service, via **docker compose**. `Docker-compose` works by parsing a proper text file, written in the YAML language. Our file should have three services, building the **Jupyter custom image** we just created, the **Redis image** and a **Portainer** image. he names of the images can be found by running `docker images`. 
+
 If docker-compose is not available in the VM, download it with:
 ```
 sudo apt update && sudo apt install -y docker-compose
 ```
-Create a file called `docker-compose.yml`. You may see the file I created (`docker-compose.yml`). This part is crucial: you have to put all the flags of the docker run commands in this file. Go back on the previous docker run commands to see them. 
-
-Portainer is an open source Docker graphical manager tool that allows us to create and manage docker containers from the browser. During the course we used the following command to run the Portainer container: 
+**Portainer** is an open source Docker graphical manager tool that allows us to create and manage docker containers from the browser. During the course we used the following command to run the Portainer container: 
 ```
 docker run -d --rm -p 8000:8000 -p 443:9443 --name=portainer -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce
 ```
 <u>Note: make sure that all the ports are open for your security group in the inbound rules of your VM</u>.
+
+### 4.1 Docker compose
+Create a file called `docker-compose.yml`. You may see the file I created (`docker-compose.yml`). This part is crucial: you have to put all the flags of the docker run commands in this file.  Let's remember these three commands:
+```
+#redis
+docker run -d --rm --name my_redis -v ~/review:/data --network bdp2-net --user 1000 redis redis-server
+
+#custom jupyter
+docker run -d --rm --name bdp2_mid_term_review -v ~/review/BDP2_mid-term_review/work:/home/jovyan -p 80:8888 --network bdp2-net -e JUPYTER_ENABLE_LAB=yes -e JUPYTER_TOKEN="bdp2_password" --user root -e CHOWN_HOME=yes -e CHOWN_HOME_OPTS="-R" gorsini/bdp2_mid_term_review
+
+#portainer
+docker run -d --rm -p 8000:8000 -p 443:9443 --name=portainer -v
+/var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce
+```
+The container building is done under `services`.
+This is the parallelism between the `docker run` flags and the `docker-compose.yml` commands:
+
+- Under `services`: we have three different levels, one for each container. The names of these levels are the names that will be used to name the container (before under the `--name`v flag)
+- `image`: the name of the image (unflagged in `docker run`)
+- `ports`: `-p` flag.
+- `volumes`: `-v` flags. Important: if one of these flags links a volume to the container, the volume name has to be specified outside `services`, under `volumes` (see the case of the volume `portainer_data`)
+- `networks`: as we want the three containers to be able to communicate between each other, we have to put them under the same network. As with the case of volumes, the name of the network(s) in use has to be specified in another section outside services, `networks`
+- `environment`: `-e` flag. In the case of the password needed to connect to Jupyter Notebooks, `JUPYTER_TOKEN`, we do not want it to be visible to anyone. This is why I decided to set an environment variable, called `JUPYTER_PW`, that will look for my password in the `.env` file I have created in the same directory as the `docker-compose.yml` file. Note: to keep from adding this file to git, add the file name (`.env`) to the `.gitignore` file
+- user: `--user` tag
+
+Taking all of this into consideration, this is the resulting docker-compose.yml file:
+
+```
+version: '3'
+volumes:
+   portainer_data:
+services:
+   redis:
+     image: redis
+     volumes:
+       - ~/review:/data
+     networks: 
+       - bdp2-net
+   jupyter:
+     image: gorsini/bdp2_mid_term_review
+     environment:
+       - JUPYTER_ENABLE_LAB=yes
+       - JUPYTER_TOKEN=bdp2_password
+       - CHOWN_HOME=yes
+       - CHOWN_HOME_OPTS=-R
+     ports:
+       - 80:8888
+     volumes:
+       - ~/review/BDP2_mid-term_review/work:/home/jovyan
+     networks:
+       - bdp2-net
+   portainer:
+     image: portainer/portainer-ce
+     volumes:
+       - /var/run/docker.sock:/var/run/docker.sock
+       - portainer_data:/data 
+     ports: 
+       - 8000:8000
+       - 443:9443
+     networks:
+       - bdp2-net
+networks:
+   bdp2-net:
+```
 
 Verify that everything works by running the command:
 ```
 docker-compose up -d
 docker ps
 ```
-You should see the 3 containers. Write a Jupyter file like we did in step 1 and 3 (in my case, `test2.ipynb`). The Jupyter file that you write should be visible from the work directory. In the Jupyuter notebook, Redis as to be already installed: <u>pay attention to connect to the new redis image you created.</u>
+You should see the 3 containers running. The command will automatically create a new bridge network.
+
+Before checking with portainer that the containers are working successfully, remember to open port 443 (of the portainer container) for your laptop to be able to access the portainer website, https://<VM1_public_IP>. Log in to portainer (choose whatever admin password you want when connecting for the first time), and click on "Get started", to visualise your local compartment.
+
+Check that the Redis server and Jupyter are working by connecting to Jupyter Notebooks (http://<VM1_public_IP>:80). Write a Jupyter file like we did in step 1 and 3 (in my case, `test2.ipynb`). The Jupyter file that you write should be visible from the work directory.
 
 Once everything is done, close the application stack with the command:
 ```
@@ -261,23 +340,25 @@ If you have done things correctly, you now have a single docker-compose command 
 
 Moreover, all is stored in a GitHub repository, which comprises a GitHub action that automatically builds and store a costume image on DockerHub.
 
-All the files generated for my mid term review are stored in the present directory.
+All the files generated for my mid-term review are stored in the present directory.
 
 ## 6. Extra
-### 6.1 Try to implement https to jupyter
-Jupyter Notebook can be accessed also with https. To do that, we need to add the port `433:8888` to our Jupyter container, in the `docker-compose` file.
-This, however will issue an error as port 443 is already occupied by Portainer. 
+### 6.1 Try to implement `https` to Jupyter
+Jupyter Notebook can also be accessed with HTTPS. To do that, we need to add the port `433:8888` to our Jupyter container in the `docker-compose` file.
+This, however will issue an error as Portainer already occupies port 443. 
 
-To solve the error, I tried to issue the `docker run` command for the Jupyter image but changing the ports in the -p flag:
+To solve the error, I tried to issue the `docker run` command for the Jupyter image but changing the ports in the `-p` flag:
 ```
-docker run -d --rm --name my_redis_jupyter -v ~/review/bdp2-review/work:/home/jovyan -p 80:8888 -p 443:8888 --network bdp2-net -e JUPYTER_ENABLE_LAB=yes -e JUPYTER_TOKEN="bdp2_ltm" --user root -e CHOWN_HOME=yes -e CHOWN_HOME_OPTS="-R" torresmasdeu/ltm_jupyter
+docker run -d --rm --name my_redis -v ~/review:/data --network bdp2-net --user 1000 redis redis-server
+
+docker run -d --rm --name bdp2_mid_term_review -v ~/review/BDP2_mid-term_review/work:/home/jovyan -p 80:8888 -p 443:8888--network bdp2-net -e JUPYTER_ENABLE_LAB=yes -e JUPYTER_TOKEN="bdp2_password" --user root -e CHOWN_HOME=yes -e CHOWN_HOME_OPTS="-R" gorsini/bdp2_mid_term_review
 ```
-The container is created with no issues, but still Jupyter is not accessible trough the https. Searching online, the solution seems to be that Jupyter can be accessible from https just with an `SSL certificate`, that enables the access.
+The container is created with no issues, but still Jupyter is not accessible through the `https`. Searching online, the solution seems to be that Jupyter can be accessible from `https` just with an `SSL certificate`, that enables the access.
 
 ### 6.2  Show if and how it works on your laptop in the same way it works on VM1
-It is possible to execute the docker-compose from your own laptop. To do so, you have to have installe the `Docker Desktop app`.
+You can execute the `docker-compose` from your laptop. To do so, you must have installed the Docker Desktop app.
 
-For semplicity, we may recreate the directory `review` as we did on VM1, so that we may use the same `docker-compose.yml`. We also should clone the GitHub repo in our new review directory.
+For simplicity, we may recreate the directory `review` as we did on VM1 so that we may use the same `docker-compose.yml`. We also should clone the GitHub repo in our new review directory.
 
 Then, by running the docker-compose like before, we should activate the three containers. We can check that with `docker ps`.
 
