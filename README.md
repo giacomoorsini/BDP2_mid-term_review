@@ -1,4 +1,4 @@
-# BDP2_mid-term_review
+# BDP2 mid-term review: Building a custom Jupyter Notebook Docker image using GitHub actions to build it automatically on DockerHub and create an application stack
 This repository contains the necessary information and files generated to complete the mid-term review for the Big Data Processing course of the Master's Degree in Bioinformatics of the Università di Bologna, course 2022-2023.
 The exercise consists of the following steps:
 
